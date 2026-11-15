@@ -322,13 +322,27 @@ const store = {
     try { return JSON.parse(localStorage.getItem(ROOT)) || S || {}; } catch(e){ return S || {}; }
   },
   set(path,val){ /* S önce bellekte değiştirilir, sonra buraya yazılır */
-    if (DB_URL) return fetch(`${DB_URL}/${ROOT}/${path}.json`,{method:'PUT',body:JSON.stringify(val)}).catch(()=>toast('Bağlantı yok, kayıt gönderilemedi.'));
+    if (DB_URL){ qPush(path,val); return flush(); }
     try { localStorage.setItem(ROOT, JSON.stringify(S)); } catch(e){}
   }
 };
+/* Bekleyen kayıtlar: bağlantı koparsa yazılanlar sırayla telefonda tutulur, bağlantı gelince gönderilir. Puan kaybolmaz. */
+let Q=[]; try{ Q=JSON.parse(localStorage.getItem('bekleyen_'+ROOT))||[]; }catch(e){}
+function qSave(){ try{ localStorage.setItem('bekleyen_'+ROOT, JSON.stringify(Q)); }catch(e){} }
+function qPush(path,val){ Q=Q.filter(x=>x[0]!==path); Q.push([path,val]); qSave(); }
+let flushing=null, offWarn=0;
+function flush(){ if(flushing) return flushing; flushing=(async()=>{
+    while(Q.length){ const [path,val]=Q[0];
+      try{ const r=await fetch(`${DB_URL}/${ROOT}/${path}.json`,{method:'PUT',body:JSON.stringify(val)}); if(!r.ok) throw 0; }
+      catch(e){ if(Date.now()-offWarn>30000){ offWarn=Date.now(); toast('Bağlantı yok. Kayıtların telefonda bekliyor, bağlantı gelince gönderilecek.'); } break; }
+      if(Q[0]&&Q[0][0]===path&&Q[0][1]===val) Q.shift(); qSave(); }
+  })().finally(()=>{ flushing=null; }); return flushing; }
+window.addEventListener('online',()=>flush());
+setInterval(()=>{ if(Q.length) flush(); },15000);
+
 /* Otomatik güncelleme: yeni sürüm yayınlanınca veritabanındaki 'ver' artırılır; oyun bunu görünce
    (soru çözülmüyor, yazı yazılmıyorsa) önbelleği atlayarak kendini yeniler. */
-const SURUM = 4;
+const SURUM = 5;
 function checkVer(){ const v=+((S&&S.ver)||0); if(v<=SURUM) return;
   if(document.querySelector('.opt,#cq,textarea,input:focus')) return;
   const k='yenilendi_'+v; try{ if(sessionStorage.getItem(k)) return; sessionStorage.setItem(k,'1'); }catch(e){}
@@ -336,7 +350,7 @@ function checkVer(){ const v=+((S&&S.ver)||0); if(v<=SURUM) return;
 /* Her ekranda: dakikada bir ve uygulama öne geldiğinde sadece sürüm numarasına bak (birkaç bayt) */
 async function verPoll(){ if(!DB_URL||document.hidden) return; try{ const v=await fetch(`${DB_URL}/${ROOT}/ver.json`,{cache:'no-store'}).then(r=>r.json()); if(S){ S.ver=v; checkVer(); } }catch(e){} }
 setInterval(verPoll,60000); document.addEventListener('visibilitychange',verPoll); window.addEventListener('pageshow',verPoll);
-async function sync(){ try { S = norm(await store.get()); checkVer(); } catch(e){ S = S || norm({}); toast('Bağlantı yok, son bilinen durum gösteriliyor.'); } }
+async function sync(){ try { if(DB_URL&&Q.length) await flush(); S = norm(await store.get()); checkVer(); return true; } catch(e){ S = S || norm({}); toast('Bağlantı yok, son bilinen durum gösteriliyor.'); return false; } }
 const P = () => S.players[me];
 function logEv(m){ S.log=(S.log||[]).concat({t:Date.now(),m}).slice(-60); store.set('log',S.log); }
 function when(t){ const d=new Date(t), n=new Date(); const hm=d.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}); return (d.toDateString()===n.toDateString()?'bugün ':d.toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit'})+' ')+hm; }
@@ -650,7 +664,17 @@ async function migrate(){
   const seenL=new Set(S.log.map(x=>x.t+x.m)); S.log=S.log.concat(L.log.filter(x=>!seenL.has(x.t+x.m))).sort((a,b)=>a.t-b.t).slice(-60); w.push(['log',S.log]);
   try{ await Promise.all(w.map(([p,v])=>fetch(`${DB_URL}/${ROOT}/${p}.json`,{method:'PUT',body:JSON.stringify(v)}).then(r=>{ if(!r.ok) throw 0; }))); localStorage.setItem('migrated_'+ROOT,'1'); logEv('Bir telefonun eski kaydı ortak tabloya aktarıldı'); }catch(e){}
 }
-sync().then(migrate).then(home);
+/* Açılış: veritabanına bağlanmadan oyun açılmaz (puanlar telefonda sıkışmasın diye) */
+function offView(t){ app.innerHTML=`<div class="center" style="margin-top:80px">${LOGO}<h2>${t}</h2><p class="mute">Puanların kaybolmasın diye oyun yalnızca ortak tabloya bağlıyken açılır.</p><button class="btn" data-act="boot">Tekrar dene</button></div>`; }
+async function boot(){
+  if(!DB_URL) return offView('Oyun ortak tabloya bağlı değil. Babana haber ver.');
+  if(!(await sync())) return offView('İnternet bağlantısı yok');
+  await migrate(); home();
+}
+ACT.boot=boot; window.addEventListener('online',()=>{ if($('[data-act=boot]')) boot(); });
+/* Güncelleme görevlisi: her açılışta sayfanın en yenisini sunucudan ister */
+if('serviceWorker' in navigator && DB_URL) navigator.serviceWorker.register('sw.js').catch(()=>{});
+boot();
 </script>
 </body>
 </html>
