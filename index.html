@@ -326,7 +326,14 @@ const store = {
     try { localStorage.setItem(ROOT, JSON.stringify(S)); } catch(e){}
   }
 };
-async function sync(){ try { S = norm(await store.get()); } catch(e){ S = S || norm({}); toast('Bağlantı yok, son bilinen durum gösteriliyor.'); } }
+/* Otomatik güncelleme: yeni sürüm yayınlanınca veritabanındaki 'ver' artırılır; oyun bunu görünce
+   (soru çözülmüyor, yazı yazılmıyorsa) önbelleği atlayarak kendini yeniler. */
+const SURUM = 3;
+function checkVer(){ const v=+((S&&S.ver)||0); if(v<=SURUM) return;
+  if(document.querySelector('.opt,#cq,textarea,input:focus')) return;
+  const k='yenilendi_'+v; try{ if(sessionStorage.getItem(k)) return; sessionStorage.setItem(k,'1'); }catch(e){}
+  toast('Yeni sürüm geldi, yenileniyor…'); setTimeout(()=>location.replace(location.pathname+'?v='+v),1200); }
+async function sync(){ try { S = norm(await store.get()); checkVer(); } catch(e){ S = S || norm({}); toast('Bağlantı yok, son bilinen durum gösteriliyor.'); } }
 const P = () => S.players[me];
 function logEv(m){ S.log=(S.log||[]).concat({t:Date.now(),m}).slice(-60); store.set('log',S.log); }
 function when(t){ const d=new Date(t), n=new Date(); const hm=d.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}); return (d.toDateString()===n.toDateString()?'bugün ':d.toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit'})+' ')+hm; }
