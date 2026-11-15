@@ -91,6 +91,10 @@ ol.rules.flow li:nth-child(6){animation-delay:15s}ol.rules.flow li:nth-child(7){
 .baba{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:14px}
 .baba img{width:34px;height:34px;border-radius:50%;object-fit:cover;border:2px solid var(--line)}
 .pl{position:relative;overflow:visible;padding-left:120px;min-height:96px;margin-top:22px}
+.pl.ghost{background:transparent;border:2px dashed var(--line);opacity:.75;min-height:84px}
+.pl.ghost .nm{font-size:20px;color:var(--mute)}
+.pl.ghost small{color:var(--mute);text-transform:none;letter-spacing:0}
+.pl .qm{position:absolute;left:30px;top:50%;transform:translateY(-50%);width:60px;height:60px;border:2px dashed var(--line);border-radius:50%;display:grid;place-items:center;font:800 28px var(--fd);color:var(--mute)}
 .pl img{position:absolute;left:8px;bottom:-1px;width:104px;height:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))}
 .season{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--mute)}
 .season b{color:var(--acc);font-variant-numeric:tabular-nums;font-family:var(--fd);font-size:16px}
@@ -373,6 +377,7 @@ function home(){
   <section><h3>Skor tablosu</h3>
   ${order.map((id,i)=>{ const lead = a!==b && i===0; return `<button class="pl${lead?' lead':''}" data-act="pin" data-arg="${id}"><img src="${IMG[id]}" alt="${NAMES[id]}">
     <span class="nm">${NAMES[id]}<small>${a===b?'Berabere':lead?'👑 Lider':'Takipte'}</small></span><span class="sc">${S.players[id].score}</span></button>`; }).join('')}
+  ${[1,2].map(()=>`<div class="pl ghost" title="Yeni oyuncular 2. sezonda katılacak"><span class="qm">?</span><span class="nm">Yeni oyuncu<small>2. sezon oyuncuları yakında burada</small></span></div>`).join('')}
   </section>
   ${S.meta.champs.length?`<section><h3>Şeref kürsüsü</h3>${S.meta.champs.slice().reverse().map(c=>`<div class="card row sb"><span>${c.s}. sezon · ${c.w?'🏆 '+NAMES[c.w]:'Berabere'}</span><span class="mute">Ilgın ${c.a} – Ecem ${c.b} · ${c.d}</span></div>`).join('')}</section>`:''}
   
