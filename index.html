@@ -328,11 +328,14 @@ const store = {
 };
 /* Otomatik güncelleme: yeni sürüm yayınlanınca veritabanındaki 'ver' artırılır; oyun bunu görünce
    (soru çözülmüyor, yazı yazılmıyorsa) önbelleği atlayarak kendini yeniler. */
-const SURUM = 3;
+const SURUM = 4;
 function checkVer(){ const v=+((S&&S.ver)||0); if(v<=SURUM) return;
   if(document.querySelector('.opt,#cq,textarea,input:focus')) return;
   const k='yenilendi_'+v; try{ if(sessionStorage.getItem(k)) return; sessionStorage.setItem(k,'1'); }catch(e){}
   toast('Yeni sürüm geldi, yenileniyor…'); setTimeout(()=>location.replace(location.pathname+'?v='+v),1200); }
+/* Her ekranda: dakikada bir ve uygulama öne geldiğinde sadece sürüm numarasına bak (birkaç bayt) */
+async function verPoll(){ if(!DB_URL||document.hidden) return; try{ const v=await fetch(`${DB_URL}/${ROOT}/ver.json`,{cache:'no-store'}).then(r=>r.json()); if(S){ S.ver=v; checkVer(); } }catch(e){} }
+setInterval(verPoll,60000); document.addEventListener('visibilitychange',verPoll); window.addEventListener('pageshow',verPoll);
 async function sync(){ try { S = norm(await store.get()); checkVer(); } catch(e){ S = S || norm({}); toast('Bağlantı yok, son bilinen durum gösteriliyor.'); } }
 const P = () => S.players[me];
 function logEv(m){ S.log=(S.log||[]).concat({t:Date.now(),m}).slice(-60); store.set('log',S.log); }
